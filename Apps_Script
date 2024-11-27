@@ -1,0 +1,248 @@
+// Função principal ativada sempre que ocorre uma edição na planilha
+function onEdit(e) {
+    try {
+        preencherHorario(e); // Preenche automaticamente o horário/dia na primeira coluna
+        salvarUltimaCelulaEditada(e); // Salva a última célula editada
+    } catch (error) {
+        Logger.log("Erro em onEdit: " + error.message);
+    }
+}
+
+// Salva a última célula editada no armazenamento do documento
+function salvarUltimaCelulaEditada(e) {
+    try {
+        const sheet = e.range.getSheet();
+        const range = e.range.getA1Notation();
+        const properties = PropertiesService.getDocumentProperties();
+        properties.setProperty('LAST_EDITED', sheet.getName() + '!' + range);
+    } catch (error) {
+        Logger.log("Erro em salvarUltimaCelulaEditada: " + error.message);
+    }
+}
+
+// Move o foco para a última célula editada ao abrir o documento
+function onOpen() {
+    try {
+        const properties = PropertiesService.getDocumentProperties();
+        const lastEdited = properties.getProperty('LAST_EDITED');
+        if (lastEdited) {
+            const [sheetName, rangeNotation] = lastEdited.split('!');
+            const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+            if (sheet) {
+                const range = sheet.getRange(rangeNotation);
+                sheet.activate();
+                range.activate();
+            }
+        }
+    } catch (error) {
+        Logger.log("Erro em onOpen: " + error.message);
+    }
+}
+
+// Preenche a célula na coluna "HORÁRIO" com o dia e horário atual no formato "d - HH:mm"
+// Isso acontece somente se outras colunas críticas da linha estiverem preenchidas
+function preencherHorario(e) {
+    try {
+        const range = e.range; // Representa a célula editada
+        const sheet = e.source.getActiveSheet();
+        const row = range.getRow(); // Linha editada
+        const colunasCriticas = [2, 3, 4]; // "MOTOBOY", "PAGAMENTO", "PLATAFORMA"
+
+        // Verifica se todas as colunas críticas estão preenchidas
+        const preenchido = colunasCriticas.every(col => sheet.getRange(row, col).getValue().trim() !== "");
+        const colunaHorario = 1;
+
+        // Preenche o horário na coluna 1, se ainda estiver vazia
+        if (preenchido && sheet.getRange(row, colunaHorario).getValue() === "") {
+            const hoje = new Date();
+            const diaHora = Utilities.formatDate(hoje, Session.getScriptTimeZone(), "d - HH:mm");
+            sheet.getRange(row, colunaHorario).setValue(diaHora);
+        }
+    } catch (error) {
+        Logger.log("Erro em preencherHorario: " + error.message);
+    }
+}
+
+// Verifica se existe uma aba para o mês atual no formato "MM-yyyy" (exemplo: "11-2024").
+// Caso não exista, cria uma nova aba com os cabeçalhos padrão e aplica validações de dados.
+function criarAbaMensal() {
+    try {
+        const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+        const hoje = new Date();
+        const nomeAba = Utilities.formatDate(hoje, Session.getScriptTimeZone(), "MM-yyyy");
+
+        // Verifica se a aba já existe
+        if (!spreadsheet.getSheetByName(nomeAba)) {
+            const novaAba = spreadsheet.insertSheet(nomeAba);
+
+            // Insere os cabeçalhos na nova aba
+            const headers = [
+                "HORÁRIO", "MOTOBOY", 
+                "PAGAMENTO 1", "PLATAFORMA 1", "N° PEDIDO 1",
+                "PAGAMENTO 2", "PLATAFORMA 2", "N° PEDIDO 2",
+                "PAGAMENTO 3", "PLATAFORMA 3", "N° PEDIDO 3",
+                "PAGAMENTO 4", "PLATAFORMA 4", "N° PEDIDO 4",
+                "PAGAMENTO 5", "PLATAFORMA 5", "N° PEDIDO 5",
+            ];
+            novaAba.getRange(1, 1, 1, headers.length).setValues([headers]);
+            novaAba.setFrozenRows(1); // Congela a linha dos cabeçalhos
+
+            // Salva o foco inicial para a nova aba
+            const properties = PropertiesService.getDocumentProperties();
+            properties.setProperty('LAST_EDITED', nomeAba + '!A2'); // Foco inicial na célula A2
+
+            // Aplica validações e formatações
+            aplicarValidacaoDados(novaAba);
+            aplicarCorCinza(novaAba);
+            protegerEstrutura(novaAba);
+        }
+    } catch (error) {
+        Logger.log("Erro em criarAbaMensal: " + error.message);
+    }
+}
+
+
+// Função para formatar as colunas "N° PEDIDO" como texto
+function formatarNumeroPedidoComoTexto(sheet) {
+    try {
+        const colunasPedidos = [5, 8, 11, 14, 17]; // Colunas de "N° PEDIDO 1, 2, 3, 4, 5"
+        
+        colunasPedidos.forEach(coluna => {
+            const range = sheet.getRange(2, coluna, sheet.getMaxRows() - 1);
+            range.setNumberFormat('@STRING@'); // Formata como texto
+        });
+
+        Logger.log("Colunas de 'N° PEDIDO' formatadas como texto.");
+    } catch (error) {
+        Logger.log("Erro ao formatar N° PEDIDO como texto: " + error.message);
+    }
+}
+
+// Aplica validações de dados e cores às colunas relevantes
+function aplicarValidacaoDados(sheet) {
+    try {
+        // Aplicar validações de dados
+        aplicarValidacaoColunas(sheet, [2], ["Amanda", "Bob", "Du", "Eltron", "Evandro", "Felipe", "Ferreira", "Heitor", "Jack", "Melo", "Paulo", "Pallazi", "Rodrigo", "Tomas", "Toca", "Will", "Bico 1", "Bico 2"]); // MOTOBOY
+        aplicarValidacaoColunas(sheet, [4, 7, 10, 13, 16], ["iFood", "App Yok", "TEL"]); // PLATAFORMA
+        aplicarValidacaoColunas(sheet, [3, 6, 9, 12, 15], ["Pago", "Cartão", "Dinheiro"]); // PAGAMENTO
+
+        // Aplicar cores por valor (formatação condicional) em cada coluna específica
+        const maxRows = sheet.getMaxRows() - 1;
+
+        // Cores para PLATAFORMA
+        const coresPlataforma = { "iFood": "#FF6666", "App Yok": "#FFCC00", "TEL": "#FF8000" };
+        const colunasPlataforma = [4, 7, 10, 13, 16];
+        colunasPlataforma.forEach(coluna => {
+            const range = sheet.getRange(2, coluna, maxRows, 1);
+            aplicarCoresPorValor(range, coresPlataforma);
+        });
+
+        // Cores para PAGAMENTO
+        const coresPagamento = { "Pago": "#66FF66", "Cartão": "#4F92FF", "Dinheiro": "#FF3333" };
+        const colunasPagamento = [3, 6, 9, 12, 15];
+        colunasPagamento.forEach(coluna => {
+            const range = sheet.getRange(2, coluna, maxRows, 1);
+            aplicarCoresPorValor(range, coresPagamento);
+        });
+
+        Logger.log("Validações e cores aplicadas com sucesso!");
+    } catch (error) {
+        Logger.log("Erro em aplicarValidacaoDados: " + error.message);
+    }
+}
+//Aplica cores por valor em um intervalo fornecido
+function aplicarCoresPorValor(range, valoresCores) {
+    try {
+        const regras = [];
+        for (const valor in valoresCores) {
+            const cor = valoresCores[valor];
+            const regra = SpreadsheetApp.newConditionalFormatRule()
+                .whenTextEqualTo(valor)
+                .setBackground(cor)
+                .setRanges([range]) // Aplica a regra ao intervalo fornecido
+                .build();
+            regras.push(regra);
+        }
+
+        // Obtém as regras existentes e adiciona as novas
+        const sheet = range.getSheet();
+        const existingRules = sheet.getConditionalFormatRules();
+        sheet.setConditionalFormatRules(existingRules.concat(regras));
+    } catch (error) {
+        Logger.log("Erro em aplicarCoresPorValor: " + error.message);
+    }
+}
+
+
+
+// Função auxiliar para aplicar validação de dados nas colunas
+function aplicarValidacaoColunas(sheet, colunas, valores) {
+    colunas.forEach(col => {
+        const range = sheet.getRange(2, col, sheet.getMaxRows() - 1);
+        const regra = SpreadsheetApp.newDataValidation()
+            .requireValueInList(valores, true)
+            .setAllowInvalid(false)
+            .build();
+        range.setDataValidation(regra);
+    });
+}
+
+// Aplica cores por valor em um intervalo fornecido
+function aplicarCoresPorValor(range, valoresCores) {
+    try {
+        const regras = [];
+        for (const valor in valoresCores) {
+            const cor = valoresCores[valor];
+            const regra = SpreadsheetApp.newConditionalFormatRule()
+                .whenTextEqualTo(valor)
+                .setBackground(cor)
+                .setRanges([range])
+                .build();
+            regras.push(regra);
+        }
+        const sheet = range.getSheet();
+        const existingRules = sheet.getConditionalFormatRules();
+        sheet.setConditionalFormatRules(existingRules.concat(regras));
+    } catch (error) {
+        Logger.log("Erro em aplicarCoresPorValor: " + error.message);
+    }
+}
+
+function aplicarCorCinza(sheet) {
+    try {
+        const corCinzaClaro = "#D3D3D3";
+        const colunas = [
+            {start: 3, end: 5},   // CDE
+            {start: 9, end: 11},  // IJK
+            {start: 15, end: 17}  // OPQ
+        ];
+
+        // Aplicando a cor cinza claro em cada intervalo
+        colunas.forEach(coluna => {
+            const range = sheet.getRange(2, coluna.start, sheet.getMaxRows() - 1, coluna.end - coluna.start + 1);
+            range.setBackground(corCinzaClaro);
+        });
+
+    } catch (error) {
+        Logger.log("Erro em aplicarCorCinza: " + error.message);
+    }
+}
+
+// Protege a estrutura da aba criada
+function protegerEstrutura(sheet) {
+    try {
+        const protecao = sheet.protect();
+        if (!protecao.isProtected()) {
+            protecao.setDescription("Proteção da estrutura da tabela");
+            protecao.setWarningOnly(false); // Gera erro ao tentar editar sem permissão
+            protecao.removeEditors(protecao.getEditors()); // Remove editores padrão
+            protecao.addEditor(Session.getEffectiveUser()); // Apenas o proprietário pode editar
+
+            // Permitir apenas edição nas células de dados
+            const rangeEditavel = sheet.getRange(2, 1, sheet.getMaxRows() - 1, sheet.getMaxColumns());
+            protecao.setUnprotectedRanges([rangeEditavel]);
+        }
+    } catch (error) {
+        Logger.log("Erro em protegerEstrutura: " + error.message);
+    }
+}
