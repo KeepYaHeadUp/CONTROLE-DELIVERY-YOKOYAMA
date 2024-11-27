@@ -9,6 +9,14 @@ Criar uma ferramenta eficiente e prática para gerenciar pedidos, automatizando 
 
 ---
 
+## 🎨 Layout do Aplicativo
+
+Segue abaixo uma visualização do layout do aplicativo:
+
+![CONTOLE LAYOUT](CONTOLE%20LAYOUT.png)
+
+---
+
 ## 🚀 **Funcionalidades**
 1. **Atualização automática de horário:**
    - Preenche automaticamente a coluna "HORÁRIO" com o dia e a hora de criação do pedido, desde que todas as colunas críticas (entregador, pagamento e plataforma) estejam preenchidas.
