@@ -107,5 +107,5 @@ Este projeto é open-source e está disponível sob a licença MIT. Sinta-se à 
 ## 📬 **Contato**
 Para dúvidas ou sugestões, entre em contato:
 - **Autor:** Carlos
-- **Linkedin** [https://www.linkedin.com/in/carlos-nogueira-80b47b96]
+- **Linkedin** [linkedin](https://www.linkedin.com/in/carlos-nogueira-80b47b96)
 - **E-mail:** [carloshhnai@gmail.com]
