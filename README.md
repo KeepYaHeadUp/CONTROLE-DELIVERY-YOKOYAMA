@@ -9,6 +9,11 @@ Criar uma ferramenta eficiente e prática para gerenciar pedidos, automatizando 
 
 ---
 
+## ✨ **Por que este projeto foi criado?**
+Ao assumir a posição de controle do delivery, o processo era inteiramente manual, utilizando papel para registrar os pedidos. Isso resultava em atrasos significativos de até 30 minutos, já que o controle demandava deslocamentos físicos e tempo adicional para despachar os pedidos. Observando essas ineficiências, decidi criar uma solução automatizada para otimizar o fluxo de trabalho e reduzir atrasos, mesmo não sendo remunerado diretamente por esse esforço.
+
+---
+
 ## 🎨 Layout do Aplicativo
 
 Segue abaixo uma visualização do layout do aplicativo:
