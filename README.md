@@ -13,7 +13,7 @@ Criar uma ferramenta eficiente e prática para gerenciar pedidos, automatizando 
 
 Segue abaixo uma visualização do layout do aplicativo:
 
-![CONTOLE LAYOUT](CONTOLE%20LAYOUT.png)
+![CONTOLE LAYOUT](CONTROLE%20LAYOUT.png)
 
 ---
 
