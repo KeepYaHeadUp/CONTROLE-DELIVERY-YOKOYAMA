@@ -46,6 +46,12 @@ Segue abaixo uma visualização do layout do aplicativo:
 7. **Proteção da estrutura da planilha:**
    - Protege automaticamente as abas contra edições acidentais, mantendo a integridade do formato.
 
+8. **Adição de nova funcionalidade - Foco na última célula editada:**
+   - A planilha agora salva e restaura a última célula editada, facilitando a continuidade do trabalho.
+   
+9. **Backup organizado e automatizado por ano:**
+   - O sistema realiza o backup das abas do ano atual, excluindo a aba do mês atual. As abas são movidas para um arquivo separado de backup, organizado por ano, mantendo a estrutura organizada e fácil de acessar.
+
 ---
 
 ## 🛠️ **Tecnologias Utilizadas**
