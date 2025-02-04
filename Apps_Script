@@ -1,3 +1,4 @@
+
 // Função principal ativada sempre que ocorre uma edição na planilha
 function onEdit(e) {
     try {
@@ -34,28 +35,28 @@ function onOpen() {
                 range.activate();
             }
         }
+
+        // Gerenciar backup ao abrir
+        verificarOuCriarBackupAnual();
     } catch (error) {
         Logger.log("Erro em onOpen: " + error.message);
     }
 }
 
 // Preenche a célula na coluna "HORÁRIO" com o dia e horário atual no formato "d - HH:mm"
-// Isso acontece somente se outras colunas críticas da linha estiverem preenchidas
 function preencherHorario(e) {
     try {
-        const range = e.range; // Representa a célula editada
+        const range = e.range;
         const sheet = e.source.getActiveSheet();
-        const row = range.getRow(); // Linha editada
-        const colunasCriticas = [2, 3, 4]; // "MOTOBOY", "PAGAMENTO", "PLATAFORMA"
+        const row = range.getRow();
+        const colunasCriticas = [2, 3, 4];
 
-        // Verifica se todas as colunas críticas estão preenchidas
         const preenchido = colunasCriticas.every(col => sheet.getRange(row, col).getValue().trim() !== "");
         const colunaHorario = 1;
 
-        // Preenche o horário na coluna 1, se ainda estiver vazia
         if (preenchido && sheet.getRange(row, colunaHorario).getValue() === "") {
             const hoje = new Date();
-            const diaHora = Utilities.formatDate(hoje, Session.getScriptTimeZone(), "d - HH:mm");
+            const diaHora = Utilities.formatDate(hoje, Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
             sheet.getRange(row, colunaHorario).setValue(diaHora);
         }
     } catch (error) {
@@ -63,19 +64,16 @@ function preencherHorario(e) {
     }
 }
 
-// Verifica se existe uma aba para o mês atual no formato "MM-yyyy" (exemplo: "11-2024").
-// Caso não exista, cria uma nova aba com os cabeçalhos padrão e aplica validações de dados.
+// Cria uma aba para o mês atual, se não existir
 function criarAbaMensal() {
     try {
         const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
         const hoje = new Date();
         const nomeAba = Utilities.formatDate(hoje, Session.getScriptTimeZone(), "MM-yyyy");
 
-        // Verifica se a aba já existe
         if (!spreadsheet.getSheetByName(nomeAba)) {
             const novaAba = spreadsheet.insertSheet(nomeAba);
 
-            // Insere os cabeçalhos na nova aba
             const headers = [
                 "HORÁRIO", "MOTOBOY", 
                 "PAGAMENTO 1", "PLATAFORMA 1", "N° PEDIDO 1",
@@ -85,31 +83,31 @@ function criarAbaMensal() {
                 "PAGAMENTO 5", "PLATAFORMA 5", "N° PEDIDO 5",
             ];
             novaAba.getRange(1, 1, 1, headers.length).setValues([headers]);
-            novaAba.setFrozenRows(1); // Congela a linha dos cabeçalhos
+            novaAba.setFrozenRows(1);
 
-            // Salva o foco inicial para a nova aba
             const properties = PropertiesService.getDocumentProperties();
-            properties.setProperty('LAST_EDITED', nomeAba + '!A2'); // Foco inicial na célula A2
+            properties.setProperty('LAST_EDITED', nomeAba + '!A2');
 
-            // Aplica validações e formatações
             aplicarValidacaoDados(novaAba);
             aplicarCorCinza(novaAba);
             protegerEstrutura(novaAba);
+            formatarNumeroPedidoComoTexto(novaAba);
         }
+
+        // Verifica e executa o backup antes de criar a aba mensal
+        verificarOuCriarBackupAnual();
+
     } catch (error) {
         Logger.log("Erro em criarAbaMensal: " + error.message);
     }
 }
-
-
-// Função para formatar as colunas "N° PEDIDO" como texto
+// Formata as colunas de "N° PEDIDO" como texto
 function formatarNumeroPedidoComoTexto(sheet) {
     try {
-        const colunasPedidos = [5, 8, 11, 14, 17]; // Colunas de "N° PEDIDO 1, 2, 3, 4, 5"
-        
+        const colunasPedidos = [5, 8, 11, 14, 17]; // Índices das colunas "N° PEDIDO 1, 2, 3, 4, 5"
         colunasPedidos.forEach(coluna => {
             const range = sheet.getRange(2, coluna, sheet.getMaxRows() - 1);
-            range.setNumberFormat('@STRING@'); // Formata como texto
+            range.setNumberFormat('@STRING@'); // Formata a coluna como texto
         });
 
         Logger.log("Colunas de 'N° PEDIDO' formatadas como texto.");
@@ -118,64 +116,28 @@ function formatarNumeroPedidoComoTexto(sheet) {
     }
 }
 
-// Aplica validações de dados e cores às colunas relevantes
+// Aplica validações de dados e cores diretamente às colunas
 function aplicarValidacaoDados(sheet) {
     try {
-        // Aplicar validações de dados
-        aplicarValidacaoColunas(sheet, [2], ["Amanda", "Bob", "Du", "Eltron", "Evandro", "Felipe", "Ferreira", "Heitor", "Jack", "Melo", "Paulo", "Pallazi", "Rodrigo", "Tomas", "Toca", "Will", "Bico 1", "Bico 2"]); // MOTOBOY
-        aplicarValidacaoColunas(sheet, [4, 7, 10, 13, 16], ["iFood", "App Yok", "TEL"]); // PLATAFORMA
-        aplicarValidacaoColunas(sheet, [3, 6, 9, 12, 15], ["Pago", "Cartão", "Dinheiro"]); // PAGAMENTO
+        const motoboys = ["Amanda", "Bob", "Du", "Eltron", "Evandro", "Felipe", "Ferreira", "Heitor", "Jack", "Jonathan", "Melo", "Pallazi", "Rodrigo", "Toca", "Tomas", "Will"];
+        const plataformas = ["iFood", "App Yok", "TEL"];
+        const pagamentos = ["Pago", "Cartão", "Dinheiro"];
 
-        // Aplicar cores por valor (formatação condicional) em cada coluna específica
-        const maxRows = sheet.getMaxRows() - 1;
+        // Aplicar validação de dados
+        aplicarValidacaoColunas(sheet, [2], motoboys);
+        aplicarValidacaoColunas(sheet, [4, 7, 10, 13, 16], plataformas);
+        aplicarValidacaoColunas(sheet, [3, 6, 9, 12, 15], pagamentos);
 
-        // Cores para PLATAFORMA
-        const coresPlataforma = { "iFood": "#FF6666", "App Yok": "#FFCC00", "TEL": "#FF8000" };
-        const colunasPlataforma = [4, 7, 10, 13, 16];
-        colunasPlataforma.forEach(coluna => {
-            const range = sheet.getRange(2, coluna, maxRows, 1);
-            aplicarCoresPorValor(range, coresPlataforma);
-        });
-
-        // Cores para PAGAMENTO
-        const coresPagamento = { "Pago": "#66FF66", "Cartão": "#4F92FF", "Dinheiro": "#FF3333" };
-        const colunasPagamento = [3, 6, 9, 12, 15];
-        colunasPagamento.forEach(coluna => {
-            const range = sheet.getRange(2, coluna, maxRows, 1);
-            aplicarCoresPorValor(range, coresPagamento);
-        });
+        // Aplicar cores manualmente vinculadas às validações
+        aplicarCoresPorValor(sheet, [3, 6, 9, 12, 15], { "Pago": "#66FF66", "Cartão": "#4F92FF", "Dinheiro": "#FF3333" });
+        aplicarCoresPorValor(sheet, [4, 7, 10, 13, 16], { "iFood": "#FF6666", "App Yok": "#FFCC00", "TEL": "#FF8000" });
 
         Logger.log("Validações e cores aplicadas com sucesso!");
     } catch (error) {
         Logger.log("Erro em aplicarValidacaoDados: " + error.message);
     }
 }
-//Aplica cores por valor em um intervalo fornecido
-function aplicarCoresPorValor(range, valoresCores) {
-    try {
-        const regras = [];
-        for (const valor in valoresCores) {
-            const cor = valoresCores[valor];
-            const regra = SpreadsheetApp.newConditionalFormatRule()
-                .whenTextEqualTo(valor)
-                .setBackground(cor)
-                .setRanges([range]) // Aplica a regra ao intervalo fornecido
-                .build();
-            regras.push(regra);
-        }
 
-        // Obtém as regras existentes e adiciona as novas
-        const sheet = range.getSheet();
-        const existingRules = sheet.getConditionalFormatRules();
-        sheet.setConditionalFormatRules(existingRules.concat(regras));
-    } catch (error) {
-        Logger.log("Erro em aplicarCoresPorValor: " + error.message);
-    }
-}
-
-
-
-// Função auxiliar para aplicar validação de dados nas colunas
 function aplicarValidacaoColunas(sheet, colunas, valores) {
     colunas.forEach(col => {
         const range = sheet.getRange(2, col, sheet.getMaxRows() - 1);
@@ -187,10 +149,13 @@ function aplicarValidacaoColunas(sheet, colunas, valores) {
     });
 }
 
-// Aplica cores por valor em um intervalo fornecido
-function aplicarCoresPorValor(range, valoresCores) {
-    try {
+// Aplica as cores vinculadas às colunas de validação
+function aplicarCoresPorValor(sheet, colunas, valoresCores) {
+    const maxRows = sheet.getMaxRows() - 1;
+    colunas.forEach(coluna => {
+        const range = sheet.getRange(2, coluna, maxRows, 1);
         const regras = [];
+
         for (const valor in valoresCores) {
             const cor = valoresCores[valor];
             const regra = SpreadsheetApp.newConditionalFormatRule()
@@ -200,49 +165,79 @@ function aplicarCoresPorValor(range, valoresCores) {
                 .build();
             regras.push(regra);
         }
-        const sheet = range.getSheet();
+
         const existingRules = sheet.getConditionalFormatRules();
         sheet.setConditionalFormatRules(existingRules.concat(regras));
-    } catch (error) {
-        Logger.log("Erro em aplicarCoresPorValor: " + error.message);
-    }
+    });
 }
 
+// Aplica cor cinza para melhorar a visualização
 function aplicarCorCinza(sheet) {
-    try {
-        const corCinzaClaro = "#D3D3D3";
-        const colunas = [
-            {start: 3, end: 5},   // CDE
-            {start: 9, end: 11},  // IJK
-            {start: 15, end: 17}  // OPQ
-        ];
+    const corCinzaClaro = "#D3D3D3";
+    const colunas = [{ start: 3, end: 5 }, { start: 9, end: 11 }, { start: 15, end: 17 }];
 
-        // Aplicando a cor cinza claro em cada intervalo
-        colunas.forEach(coluna => {
-            const range = sheet.getRange(2, coluna.start, sheet.getMaxRows() - 1, coluna.end - coluna.start + 1);
-            range.setBackground(corCinzaClaro);
+    colunas.forEach(({ start, end }) => {
+        const range = sheet.getRange(2, start, sheet.getMaxRows() - 1, end - start + 1);
+        range.setBackground(corCinzaClaro);
+    });
+}
+
+// Protege a estrutura da aba
+function protegerEstrutura(sheet) {
+    const protecao = sheet.protect().setDescription("Proteção da estrutura da tabela");
+    protecao.setWarningOnly(false);
+    protecao.addEditor(Session.getEffectiveUser());
+    const rangeEditavel = sheet.getRange(2, 1, sheet.getMaxRows() - 1, sheet.getMaxColumns());
+    protecao.setUnprotectedRanges([rangeEditavel]);
+}
+
+// Verifica ou cria arquivo de backup anual e move abas desatualizadas (com backup estático seguro)
+function verificarOuCriarBackupAnual() {
+    try {
+        const agora = new Date();
+        const anoAtual = agora.getFullYear();
+        const mesAtual = agora.getMonth() + 1; // Janeiro = 1, Fevereiro = 2...
+
+        const nomeBackup = `Backup_${anoAtual}`;
+        const arquivos = DriveApp.getFilesByName(nomeBackup);
+        const backupPlanilha = arquivos.hasNext()
+            ? SpreadsheetApp.open(arquivos.next())
+            : SpreadsheetApp.create(nomeBackup);
+
+        const planilhaOriginal = SpreadsheetApp.getActiveSpreadsheet();
+        const sheets = planilhaOriginal.getSheets();
+
+        sheets.forEach(sheet => {
+            const nomeAba = sheet.getName();
+            const match = nomeAba.match(/^(\d{2})-(\d{4})$/);
+
+            if (match) {
+                const mesAba = parseInt(match[1], 10);
+                const anoAba = parseInt(match[2], 10);
+
+                // Se for do ano passado OU do ano atual mas de meses anteriores, mover
+                if (anoAba < anoAtual || (anoAba === anoAtual && mesAba < mesAtual)) {
+                    Logger.log(`Movendo aba para backup: ${nomeAba}`);
+
+                    const dados = sheet.getDataRange().getValues();
+                    let abaBackup = backupPlanilha.getSheetByName(nomeAba);
+
+                    if (!abaBackup) {
+                        abaBackup = backupPlanilha.insertSheet(nomeAba);
+                    } else {
+                        abaBackup.clear();
+                    }
+
+                    abaBackup.getRange(1, 1, dados.length, dados[0].length).setValues(dados);
+                    planilhaOriginal.deleteSheet(sheet);
+
+                    Logger.log(`Aba ${nomeAba} movida para o backup.`);
+                }
+            }
         });
 
+        Logger.log("Backup concluído com sucesso.");
     } catch (error) {
-        Logger.log("Erro em aplicarCorCinza: " + error.message);
-    }
-}
-
-// Protege a estrutura da aba criada
-function protegerEstrutura(sheet) {
-    try {
-        const protecao = sheet.protect();
-        if (!protecao.isProtected()) {
-            protecao.setDescription("Proteção da estrutura da tabela");
-            protecao.setWarningOnly(false); // Gera erro ao tentar editar sem permissão
-            protecao.removeEditors(protecao.getEditors()); // Remove editores padrão
-            protecao.addEditor(Session.getEffectiveUser()); // Apenas o proprietário pode editar
-
-            // Permitir apenas edição nas células de dados
-            const rangeEditavel = sheet.getRange(2, 1, sheet.getMaxRows() - 1, sheet.getMaxColumns());
-            protecao.setUnprotectedRanges([rangeEditavel]);
-        }
-    } catch (error) {
-        Logger.log("Erro em protegerEstrutura: " + error.message);
+        Logger.log(`Erro em verificarOuCriarBackupAnual: ${error.message}`);
     }
 }
